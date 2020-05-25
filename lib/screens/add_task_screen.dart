@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertodolist/helpers/database_helper.dart';
-import 'package:fluttertodolist/models/task_model.dart';
+import 'package:fluttertodolist/db/task_database.dart';
+import 'package:fluttertodolist/helpers/db_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final Task task;
@@ -21,11 +22,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   TextEditingController _dateController = TextEditingController();
 
   void _handleDatePicker() async {
-    final DateTime date = await showDatePicker(
-        context: context,
-        initialDate: _date,
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100));
+    final DateTime date = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime(2000), lastDate: DateTime(2100));
     if (date != null && date != _date) {
       setState(() {
         _date = date;
@@ -38,15 +35,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     if (_formKey.currentState.validate()) {
       _formKey.currentState.save();
       debugPrint('Title is $_title priority is $priority and date is $_date');
-      Task task = Task(title: _title, date: _date, priority: priority);
+      final task = Task(name: _title, priority: priority, dueDate: _date);
       if (widget.task == null) {
-        task.status = 0;
-        DatabaseHelper.instance.insertTask(task);
+        Provider.of<DatabaseProvider>(context, listen: false).addTask(task);
       } else {
         // update task
-        task.id = widget.task.id;
-        task.status = widget.task.status;
-        DatabaseHelper.instance.updateTask(task);
+        final taskToUpdate = Task(id: widget.task.id, name: _title, priority: priority, dueDate: _date, completed: widget.task.completed);
+        Provider.of<DatabaseProvider>(context, listen: false).updateTask(taskToUpdate);
       }
 
       // Insert the task to our Users Database
@@ -56,7 +51,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   void _deleteTask() {
-    DatabaseHelper.instance.deleteTask(widget.task.id);
+    Provider.of<DatabaseProvider>(context, listen: false).deleteTask(widget.task);
     Navigator.pop(context);
   }
 
@@ -65,8 +60,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     super.initState();
     if (widget.task != null) {
       // we want to update a task
-      _title = widget.task.title;
-      _date = widget.task.date;
+      _title = widget.task.name;
+      _date = widget.task.dueDate;
       priority = widget.task.priority;
     }
     _dateController.text = _dateFormat.format(_date);
@@ -85,16 +80,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               children: <Widget>[
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
-                  child: Icon(Icons.arrow_back_ios,
-                      size: 30.0, color: Theme.of(context).primaryColor),
+                  child: Icon(Icons.arrow_back_ios, size: 30.0, color: Theme.of(context).primaryColor),
                 ),
                 SizedBox(height: 20.0),
                 Text(
                   widget.task != null ? 'Update Task' : 'Add Task',
-                  style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 40.0,
-                      fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.black, fontSize: 40.0, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 10.0),
                 Form(
@@ -108,11 +99,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           decoration: InputDecoration(
                               labelText: 'Title',
                               labelStyle: TextStyle(fontSize: 18.0),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0))),
-                          validator: (input) => input.trim().isEmpty
-                              ? 'Please enter a task title'
-                              : null,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0))),
+                          validator: (input) => input.trim().isEmpty ? 'Please enter a task title' : null,
                           onSaved: (input) => _title = input,
                           initialValue: _title,
                         ),
@@ -141,8 +129,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                               value: priority,
                               child: Text(
                                 priority,
-                                style: TextStyle(
-                                    color: Colors.blueAccent, fontSize: 18.0),
+                                style: TextStyle(color: Colors.blueAccent, fontSize: 18.0),
                               ),
                             );
                           }).toList(),
@@ -153,11 +140,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           decoration: InputDecoration(
                               labelText: 'priority',
                               labelStyle: TextStyle(fontSize: 18.0),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0))),
-                          validator: (input) => input.trim().isEmpty
-                              ? 'Please select a priority level'
-                              : null,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0))),
+                          validator: (input) => input.trim().isEmpty ? 'Please select a priority level' : null,
                           onChanged: (value) {
                             setState(() {
                               priority = value;
@@ -197,8 +181,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         child: FlatButton(
                           child: Text(
                             'Delete',
-                            style:
-                                TextStyle(color: Colors.white, fontSize: 20.0),
+                            style: TextStyle(color: Colors.white, fontSize: 20.0),
                           ),
                           onPressed: _deleteTask,
                         ),
